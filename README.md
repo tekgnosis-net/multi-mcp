@@ -125,7 +125,16 @@ curl -X POST http://localhost:8080/mcp_servers \
 
 ## 🐳 Docker
 
-You can containerize and run the SSE server in K8s:
+Pre-built images are published to GHCR whenever a semantic release is cut:
+
+```bash
+docker pull ghcr.io/tekgnosis-net/multi-mcp:latest
+docker run -p 8080:8080 ghcr.io/tekgnosis-net/multi-mcp:latest
+```
+
+`docker-compose.yml` is configured to track the `latest` tag from GHCR. Override the tag by setting `IMAGE_TAG` in your environment if you want to pin a specific release locally.
+
+You can still containerize and run the SSE server in K8s:
 
 ```bash
 # Build the image

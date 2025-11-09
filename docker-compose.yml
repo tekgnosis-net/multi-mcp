@@ -1,0 +1,18 @@
+services:
+  mcp-multi:
+    image: ghcr.io/tekgnosis-net/multi-mcp:${IMAGE_TAG:-latest}
+    pull_policy: always
+    container_name: mcp-multi
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - ./config:/config
+      - ./apps:/extra_apps
+    ports:
+      - "0.0.0.0:8096:8096"
+    environment:
+      - MCP_PORT=8096
+      - MCP_HOST=0.0.0.0
+      - LOG_LEVEL=DEBUG
+      - TRANSPORT_TYPE=sse
+      - CONFIG_FILE=/config/mcp.json

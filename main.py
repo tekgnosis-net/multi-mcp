@@ -17,5 +17,7 @@ if __name__ == "__main__":
     # Parse CLI arguments and launch the MultiMCP server with the provided settings
     args = parse_args()
 
+    print(f"\n Args passed: {args}\n\n")
+
     server = MultiMCP(transport=args.transport, config=args.config, host=args.host, port=args.port, log_level=args.log_level)
     asyncio.run(server.run())

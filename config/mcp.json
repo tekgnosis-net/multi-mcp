@@ -1,0 +1,30 @@
+{
+  "mcpServers": {
+	  "time": {
+		  "command": "uvx",
+		  "args": [
+			 "mcp-server-time",
+			 "--local-timezone=Australia/Sydney"
+		  ]
+	  },
+	  "searxng": {
+		  "command": "npx",
+		  "args": [
+			  "-y",
+			  "@kevinwatt/mcp-server-searxng"
+		  ],
+		  "env": {
+			  "SEARXNG_INSTANCES": "http://10.0.20.65:8080, https://search.tekgnosis.net", 
+			  "SEARXNG_USER_AGENT": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0 Safari/537.36",
+			  "NODE_TLS_REJECT_UNAUTHORIZED": "1"
+		  }
+	  },
+	  "mcp-sequentialthinking-tools": {
+			"command": "npx",
+			"args": ["-y", "mcp-sequentialthinking-tools"],
+			"env": {
+				"MAX_HISTORY_SIZE": "10000"
+			}
+		}
+ }
+}

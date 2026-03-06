@@ -23,7 +23,7 @@ to and routing between multiple backend MCP servers. Agents connect via **Stream
 ## 📦 Installation
 
 ```bash
-git clone https://github.com/kfirtoledo/multi-mcp.git
+git clone https://github.com/tekgnosis-net/multi-mcp.git
 cd multi-mcp
 
 # Install using uv (recommended)

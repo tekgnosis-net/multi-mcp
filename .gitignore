@@ -35,3 +35,7 @@ coverage.xml
 
 # ignore anything in msc directory recursively
 msc/**
+
+# Vim swap files
+*.swp
+*.swo

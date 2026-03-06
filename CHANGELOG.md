@@ -1,3 +1,10 @@
+## [1.0.1](https://github.com/tekgnosis-net/multi-mcp/compare/v1.0.0...v1.0.1) (2026-03-06)
+
+
+### Bug Fixes
+
+* **ci:** split docker build into separate job to avoid semantic-release exit code dependency ([f52890e](https://github.com/tekgnosis-net/multi-mcp/commit/f52890eefe699a8b0ed4e6cc9a2b8b40f7809b39))
+
 # 1.0.0 (2026-03-06)
 
 

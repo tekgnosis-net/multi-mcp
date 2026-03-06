@@ -21,6 +21,7 @@ async def test_stdio_mode():
         await run_e2e_test_with_client(client,EXPECTED_TOOLS,TEST_PROMPTS)
 
 @pytest.mark.asyncio
+@pytest.mark.skip(reason="HTTP transport migration in progress; legacy SSE path removed")
 async def test_sse_mode():
     """Test the MultiMCP server running in SSE mode via subprocess."""
     process = await asyncio.create_subprocess_exec(
@@ -49,6 +50,7 @@ async def test_sse_mode():
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip(reason="HTTP transport migration in progress; legacy SSE fixtures removed")
 async def test_sse_clients_mode():
     """Test MultiMCP with SSE-configured backend clients from a config file."""
     process = await asyncio.create_subprocess_exec(

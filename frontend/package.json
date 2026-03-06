@@ -1,0 +1,36 @@
+{
+  "name": "multi-mcp-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "lint": "eslint \"src/**/*.{ts,tsx}\""
+  },
+  "dependencies": {
+    "@chakra-ui/icons": "^2.1.1",
+    "@chakra-ui/react": "^2.8.2",
+    "@emotion/react": "^11.13.5",
+    "@emotion/styled": "^11.13.5",
+    "axios": "^1.7.7",
+    "framer-motion": "^11.13.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+  "@types/node": "^22.10.1",
+  "@types/react": "^18.3.12",
+  "@types/react-dom": "^18.3.1",
+  "@typescript-eslint/eslint-plugin": "^8.13.0",
+  "@typescript-eslint/parser": "^8.13.0",
+  "@vitejs/plugin-react": "^4.3.4",
+  "eslint": "^9.14.0",
+  "eslint-config-prettier": "^9.1.0",
+  "eslint-plugin-react": "^7.37.2",
+  "eslint-plugin-react-hooks": "^5.1.0",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.2"
+  }
+}

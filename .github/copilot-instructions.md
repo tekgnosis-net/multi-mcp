@@ -10,6 +10,7 @@
 - **UI baseline**: Display the running build/version near the primary title (pulling from an env-driven constant such as `VITE_APP_VERSION`) and include a footer with `© {currentYear} Tekgnosis Pty Ltd`, computing the year at runtime so it stays current.
 - **Docker build args**: Plumb an `APP_VERSION` build arg/ENV through container builds so the frontend/banner and metadata stay synchronized with release tags.
 - **Runtime parity**: When merging frontend rewrites, ensure Dockerfile entrypoints, runtime scripts, and dependency sets are updated in the same change so published images launch the new stack (no legacy Mesop fallbacks).
+- **Local image verification**: After any change that touches runtime code, Docker assets, or API endpoints, build the local image (`docker compose build mcp-multi`) and recreate the stack to validate end-to-end behavior before handing work back.
 
 ## Release & versioning
 
@@ -20,16 +21,18 @@
 
 ## Project Snapshot
 - Multi-MCP exposes a single MCP server that multiplexes multiple backends; core runtime lives under `src/multimcp/`.
-- CLI entry `main.py` accepts `--transport stdio|sse`, `--config`, `--host`, `--port`, `--log-level` and instantiates `MultiMCP` with those settings.
+- CLI entry `main.py` accepts `--transport stdio|http`, `--config`, `--host`, `--port`, `--log-level` and instantiates `MultiMCP` with those settings (default transport is `http`).
 
 ## Architecture & Responsibilities
-- `multi_mcp.MultiMCP` loads JSON config (default `./examples/config/mcp.json`), wires Rich logging, builds an `MCPClientManager`, then starts stdio or SSE transport via `_start_*` helpers.
-- `mcp_client.MCPClientManager` owns a single `AsyncExitStack`; always create/close clients through this manager so sessions are tracked and closed via `close()`.
-- `mcp_proxy.MCPProxyServer` subclasses `mcp.server.Server`, registers request/notification handlers, and reconciles aggregated capabilities before relaying calls.
+- `multi_mcp.MultiMCP` loads JSON config (default `./examples/config/mcp.json` via CLI, `./mcp.json` via `MCPSettings`), wires Rich logging, builds an `MCPClientManager`, then serves either stdio or an HTTP management API via `start_stdio_server` / `start_http_server` helpers.
+- `mcp_client.MCPClientManager` tracks clients in `ManagedClient` wrappers, each with its own `AsyncExitStack`; use `add_client`, `remove_client`, `update_clients`, and `attach_existing` when mutating the pool so contexts close cleanly.
+- `mcp_proxy.MCPProxyServer` subclasses `mcp.server.Server`, registers request/notification handlers, reconciles aggregated capabilities, and now accumulates per-server telemetry via `ServerStats` for the HTTP dashboard endpoints.
 
 ## Transport Modes & Dynamic API
-- STDIO mode uses `mcp.server.stdio.stdio_server()` and is intended for pipe-based agents; SSE mode mounts a Starlette app with `/sse` plus `/mcp_servers`, `/mcp_servers/{name}`, `/mcp_tools` management endpoints.
-- Runtime add/remove of servers only works in SSE mode because handlers call `register_client`/`unregister_client` on `self.proxy.client_manager`.
+- STDIO mode uses `mcp.server.stdio.stdio_server()` and is intended for pipe-based agents.
+- HTTP mode exposes Starlette endpoints backed by **Streamable HTTP** (`StreamableHTTPSessionManager`) at `GET|POST|DELETE /mcp` (MCP 2025-11-25 spec) and a **legacy SSE** fallback at `GET /sse`, plus management API under `/api/*`: `GET /api/health`, `GET|PUT /api/config`, `GET|POST /api/servers`, `GET|DELETE /api/servers/{name}`, `GET /api/stats`, and `GET /api/tools`. Config updates call `MultiMCP.apply_config`, which diffs the running set, hot-swaps clients, and persists back to the path specified by `--config`.
+- The `StreamableHTTPSessionManager` lifecycle is managed via a Starlette `lifespan` context; the watcher and uvicorn run concurrently in `anyio.create_task_group()`.
+- **Config file watching**: `MultiMCP._watch_config()` uses `watchfiles.awatch` to watch the config JSON path; any change triggers `apply_config(..., persist=False)` for zero-downtime hot-reload.
 
 ## Tool & Capability Namespacing
 - Tools are renamed via `_make_key(server_name, tool_name)` (e.g. `weather_get_forecast`) before exposure; always reference namespaced names when calling `call_tool`.
@@ -37,16 +40,16 @@
 - Prompt/resource lookups are capability-aware; check `self.capabilities[name]` before calling list/get APIs to avoid "Method not found" errors.
 
 ## Client Lifecycle & Configuration
-- `create_clients` accepts `mcpServers` entries with either `command`+`args` (stdio) or `url` (SSE); env vars merge with `os.environ` and support encoding overrides from `langchain_mcp_adapters` defaults.
+- `create_clients` accepts `mcpServers` entries with either `command`+`args` (stdio) or `url` (SSE backend); env vars merge with `os.environ` and support encoding overrides from `langchain_mcp_adapters` defaults.
+- Use `update_clients` or `apply_config` to hot-reload servers; these helpers reconcile additions, removals, and changes, keeping telemetry maps in sync and rewriting the config file (path from `--config`) when `persist=True`.
 - Config load failures are logged and abort startup; when adding new config fields update `MCPSettings` in `multi_mcp.py` and mirror behavior in `load_mcp_config`.
 
 ## Logging & Error Handling
 - Use project logger namespace via `get_logger("Component")`; emojis (`✅/⚠️/❌`) appear in existing logs, keep the convention for quick scanability.
 - The proxy degrades gracefully: missing tools/prompts/resources return `ServerResult(... isError=True)` with explanatory text; follow the same pattern for new handlers.
 
-## Local Workflows
-- Preferred run: `uv run main.py --transport sse --config ./examples/config/mcp.json`; `make run` wraps the default stdio launch.
-- Targeted tests use `make test-proxy` / `make test-e2e` / `make test-lifecycle`; `make all-test` currently references a missing `test-k` target—run individual make targets or `pytest` directly when you need the full suite.
+- Preferred run: `uv run main.py --transport http --config ./examples/config/mcp.json`; `make run` wraps `uv run main.py` (defaults to HTTP transport on `127.0.0.1:8080`).
+- Targeted tests use `make test-proxy` / `make test-e2e` / `make test-lifecycle`.
 - Docker helpers: `make docker-build` builds the uv-based image, `make docker-run` maps port `8080`.
 - Compose defaults to `ghcr.io/tekgnosis-net/multi-mcp:${IMAGE_TAG:-latest}`; set `IMAGE_TAG` before `docker compose up` to test a specific release.
 
@@ -57,7 +60,7 @@
 
 ## Extensibility Notes
 - New request/notification types should be registered in `_register_request_handlers`; keep capability checks and logging consistent.
-- When adding clients dynamically, ensure `register_client` populates all maps; remember `unregister_client` filters existing dicts by client identity.
-- SSE handler in `MultiMCP.start_sse_server` uses `SseServerTransport("/messages/")`; align with that path if you add reverse proxies or docs.
+- When adding clients dynamically, use `apply_config` so both `MCPClientManager` and `MCPProxyServer` keep telemetry in sync; direct mutation of `client_manager.clients` is obsolete.
+- HTTP endpoints live in `MultiMCP.start_http_server`; extend them here when exposing new management capabilities (e.g., per-tool stats) and remember to persist config changes when appropriate.
 
 Let me know if any part of this guide is unclear or if other workflows should be documented.

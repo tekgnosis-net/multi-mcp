@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Multi-MCP is a Python-based proxy server that acts as a single MCP (Model Context Protocol) server while connecting to and routing between multiple backend MCP servers. It supports both STDIO and SSE (Server-Sent Events) transports and can dynamically add/remove MCP servers at runtime.
+Multi-MCP is a Python-based proxy server that acts as a single MCP (Model Context Protocol) server while connecting to and routing between multiple backend MCP servers. It supports STDIO, SSE, and HTTP transports and can dynamically add/remove MCP servers at runtime.
 
 ## Architecture
 
@@ -18,24 +18,28 @@ Multi-MCP is a Python-based proxy server that acts as a single MCP (Model Contex
 ### Key Patterns
 
 - **Tool Namespacing**: Tools are namespaced as `server_name_tool_name` to avoid conflicts when multiple servers expose tools with the same name
-- **Transport Flexibility**: Supports both STDIO (for CLI/pipe-based) and SSE (for HTTP/network-based) communication
-- **Dynamic Server Management**: Can add/remove MCP servers at runtime via HTTP API (SSE mode only)
+- **Transport Flexibility**: Supports STDIO (pipe-based), SSE (legacy), and HTTP/Streamable-HTTP (default) transports
+- **Dynamic Server Management**: Can add/remove MCP servers at runtime via the HTTP management API (`/api/servers`)
+- **Config File Watching**: `mcp.json` is watched via `watchfiles`; any change is auto-applied without a restart
 - **Capability Aggregation**: Proxies and combines tools, prompts, and resources from all connected backend servers
 
 ## Development Commands
 
 ### Running the Server
 ```bash
-# STDIO mode (default)
-uv run main.py --transport stdio
+# HTTP mode (default) — binds to 127.0.0.1:8080
+uv run main.py --transport http
 
-# SSE mode with custom host/port
-uv run main.py --transport sse --host 0.0.0.0 --port 8080
+# HTTP mode with explicit host/port
+uv run main.py --transport http --host 0.0.0.0 --port 8096
+
+# STDIO mode for pipe-based agents
+uv run main.py --transport stdio
 
 # With custom config file
 uv run main.py --config ./examples/config/mcp_k8s.json
 
-# Quick development run
+# Quick development run (HTTP, default config)
 make run
 ```
 
@@ -69,8 +73,10 @@ kubectl apply -f examples/k8s/multi-mcp.yaml
 ### Docker Container Details
 - **Base Image**: `ghcr.io/astral-sh/uv:python3.12-bookworm-slim` (Debian-based)
 - **Node.js Runtime**: Node.js 20.x installed for MCP servers requiring Node runtime
-- **Production Config**: Uses `./msc/mcp.json` with GitHub, Brave Search, and Context7 MCP servers
+- **Production Config**: `./config/mcp.json` is copied to `/app/mcp.json` at build time; currently configured with `mcp-sequentialthinking-tools`, `searxng`, and `time` servers
+- **Default Port**: `8096` (set via `MCP_PORT` env var)
 - **Network**: Binds to `0.0.0.0` for container accessibility
+- **Frontend**: React/Vite UI is built during `docker build` and served from `/app/frontend/dist`
 
 ### Dependency Management
 ```bash
@@ -102,11 +108,18 @@ Configuration is JSON-based, defining backend MCP servers to connect to:
 }
 ```
 
-### Runtime HTTP API (SSE Mode Only)
-- `GET /mcp_servers` - List active servers
-- `POST /mcp_servers` - Add new servers
-- `DELETE /mcp_servers/{name}` - Remove server
-- `GET /mcp_tools` - List all tools by server
+### Runtime HTTP API
+Available when running with `--transport http` (or `sse`). MCP transport endpoints:
+- `GET|POST|DELETE /mcp` — **Streamable HTTP** (MCP 2025-11-25 spec); primary MCP endpoint
+- `GET /sse` — **Legacy SSE** connection for older MCP clients (kept for backward compat)
+
+Management API (prefixed `/api`):
+- `GET /api/health` — liveness probe
+- `GET /api/config`, `PUT /api/config` — read / hot-reload full config
+- `GET /api/servers`, `POST /api/servers` — list / add servers
+- `GET /api/servers/{name}`, `DELETE /api/servers/{name}` — inspect / remove a server
+- `GET /api/stats` — per-server telemetry snapshot
+- `GET /api/tools` — tools list grouped by server
 
 ## Code Conventions
 
@@ -143,7 +156,11 @@ Tools are internally namespaced using `_make_key()` and `_split_key()` static me
 
 ### Transport Modes
 - **STDIO**: Pipe-based communication for CLI tools and local agents
-- **SSE**: HTTP Server-Sent Events for browser agents and network access
+- **SSE** (legacy, `/sse`): HTTP Server-Sent Events kept for backward-compatible clients; backed by `mcp.server.sse.SseServerTransport`
+- **HTTP / Streamable HTTP** (default, `/mcp`): MCP 2025-11-25 spec transport via `StreamableHTTPSessionManager`; supports stateful and stateless sessions, resumable SSE streams, and JSON-response mode
+
+### Config File Watching
+`MultiMCP` uses `watchfiles.awatch` to watch the config JSON file at the path supplied by `--config`. Any write to that file triggers `apply_config(..., persist=False)`, which hot-swaps added/removed/changed servers without restarting the process. The watcher runs as a concurrent task alongside the uvicorn server inside `anyio.create_task_group()`.
 
 ### Testing Strategy
 - **Unit tests**: Focus on individual components (proxy, client manager)
@@ -156,59 +173,52 @@ Tools are internally namespaced using `_make_key()` and `_split_key()` static me
 - `src/multimcp/mcp_proxy.py` - Core proxy server with request forwarding and capability aggregation
 - `src/multimcp/mcp_client.py` - Client lifecycle management using `AsyncExitStack`
 - `src/utils/logger.py` - Centralized Rich logging with `multi_mcp.*` namespace
+- `frontend/` - React/TypeScript/Vite dashboard UI (`npm run build` outputs to `frontend/dist/`)
+- `apps/` - Standalone helper MCP apps (e.g. `whereami-mcp.py`)
+- `config/mcp.json` - Active production config (copied into container as `/app/mcp.json`)
 - `tests/` - Comprehensive test suite with mock MCP servers and fixtures
 - `examples/config/` - Sample configuration files for different deployment scenarios
 
 ### Dependencies
 Key dependencies include:
-- `mcp>=1.4.1` - Core MCP protocol implementation
-- `langchain-mcp-adapters` - LangChain integration utilities  
-- `starlette` + `uvicorn` - SSE HTTP server
+- `mcp>=1.26.0` - Core MCP protocol implementation (Streamable HTTP, SSE, stdio transports; MCP 2025-11-25 spec)
+- `langchain-mcp-adapters` - LangChain integration utilities (no longer imported inside `mcp_client.py`; encoding defaults are defined locally)
+- `starlette` + `uvicorn` - ASGI HTTP server
+- `watchfiles` - Async file-system watcher for config hot-reload
 - `httpx-sse` - SSE client support
 - `rich` - Enhanced logging and console output
 - `pytest` + `pytest-asyncio` - Testing framework with async support
 
 ## MCP Server Status & Testing
 
-### Configured MCP Servers (msc/mcp.json)
+### Configured MCP Servers (config/mcp.json)
 
-**GitHub MCP Server** ✅ **WORKING**
-- **Server**: `github` (Node.js via npx @modelcontextprotocol/server-github)
-- **Tool Prefix**: `mcp__multi-mcp__github_*`
-- **Test Action**: `github_search_repositories` - Successfully searched repositories
-- **Capabilities**: Repository management, issues, pull requests, file operations
-- **Authentication**: Uses GITHUB_PERSONAL_ACCESS_TOKEN environment variable
+**Sequential Thinking Tools**
+- **Server**: `mcp-sequentialthinking-tools` (Node.js via `npx -y mcp-sequentialthinking-tools`)
+- **Tool Prefix**: `mcp-sequentialthinking-tools_*`
+- **Capabilities**: Structured multi-step reasoning
+- **Env**: `MAX_HISTORY_SIZE=10000`
 
-**Brave Search MCP Server** ✅ **WORKING**  
-- **Server**: `brave-search` (Node.js via npx @modelcontextprotocol/server-brave-search)
-- **Tool Prefix**: `mcp__multi-mcp__brave-search_*`
-- **Test Action**: `brave_web_search` - Successfully performed web search
-- **Capabilities**: Web search, local business search
-- **Authentication**: Uses BRAVE_API_KEY environment variable
+**SearXNG Web Search**
+- **Server**: `searxng` (Node.js via `npx -y @kevinwatt/mcp-server-searxng`)
+- **Tool Prefix**: `searxng_*`
+- **Capabilities**: Privacy-respecting meta-search via configured SearXNG instance
+- **Env**: `SEARXNG_INSTANCES`, `SEARXNG_USER_AGENT`
 
-**Context7 MCP Server** ✅ **WORKING**
-- **Server**: `context7` (Node.js via npx @upstash/context7-mcp)
-- **Tool Prefix**: `mcp__multi-mcp__context7_*`
-- **Test Actions**: `resolve-library-id` + `get-library-docs` - Successfully retrieved React documentation
-- **Capabilities**: Library documentation lookup, code examples, version-specific docs
-- **Authentication**: None required (public documentation service)
+**Time Server**
+- **Server**: `time` (Python via `uvx mcp-server-time`)
+- **Tool Prefix**: `time_*`
+- **Capabilities**: Current time/date with timezone support (default: `Australia/Sydney`)
 
 ### Tool Namespacing in Action
 All MCP tools are accessible through the multi-mcp proxy with the naming pattern:
-`mcp__multi-mcp__{server_name}_{tool_name}`
+`{server_name}_{tool_name}`
 
-**Example tested tools:**
-- `mcp__multi-mcp__github_search_repositories`
-- `mcp__multi-mcp__brave-search_brave_web_search`  
-- `mcp__multi-mcp__context7_resolve-library-id`
-- `mcp__multi-mcp__context7_get-library-docs`
+Example: `searxng_search`, `time_get_current_time`, `mcp-sequentialthinking-tools_sequentialthinking`
 
 ### Verification Status
-- **Last Tested**: 2025-06-27
-- **Test Environment**: Claude Code via multi-mcp proxy
-- **All Servers**: ✅ Functional and responsive
-- **Tool Discovery**: All namespaced tools properly exposed through proxy
-- **Error Handling**: Graceful fallback for server-specific failures
+- **Last Updated**: 2026-03-07
+- **Config**: `config/mcp.json`
 
 ## 🚨 CRITICAL Git Workflow Rules
 

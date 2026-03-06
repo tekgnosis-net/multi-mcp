@@ -105,8 +105,9 @@ async def proxy_client_2session(server_1, server_2):
     async with create_connected_server_and_client_session(server_1) as client_1, \
                create_connected_server_and_client_session(server_2) as client_2:
 
-        client_manager=MCPClientManager()
-        client_manager.clients={server_1.name: client_1,server_2.name: client_2}
+        client_manager = MCPClientManager()
+        client_manager.attach_existing(server_1.name, client_1)
+        client_manager.attach_existing(server_2.name, client_2)
         proxy = await MCPProxyServer.create(client_manager)
 
         async with create_connected_server_and_client_session(proxy) as proxy_client:
@@ -117,8 +118,8 @@ async def proxy_client_2session(server_1, server_2):
 async def proxy_client_session(server):
     """Creates a proxy with a single backend server session."""
     async with create_connected_server_and_client_session(server) as direct_client:
-        client_manager=MCPClientManager()
-        client_manager.clients={server.name: direct_client}
+        client_manager = MCPClientManager()
+        client_manager.attach_existing(server.name, direct_client)
         proxy = await MCPProxyServer.create(client_manager)
         async with create_connected_server_and_client_session(proxy) as proxy_client:
             yield proxy_client

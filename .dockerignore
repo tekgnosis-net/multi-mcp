@@ -1,0 +1,37 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+htmlcov/
+coverage.xml
+
+# Node
+frontend/node_modules/
+frontend/dist/
+
+# Editor / IDE
+.vscode/
+.idea/
+
+# Git
+.git/
+.gitignore
+
+# CI / docs
+.github/
+CHANGELOG.md
+CLAUDE.md
+README.md
+
+# Local investigation notes
+claude/
+msc/
+
+# Secrets
+.env
+.env.*
+
+# Test artefacts
+*.log

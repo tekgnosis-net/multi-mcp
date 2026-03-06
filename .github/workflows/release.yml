@@ -62,8 +62,13 @@ jobs:
 
       - name: Build and push image
         if: steps.semantic.outputs.new_release_published == 'true'
-        run: |
-          VERSION=${{ steps.semantic.outputs.new_release_version }}
-          docker build --build-arg APP_VERSION=$VERSION -t $REGISTRY/${IMAGE_NAME}:$VERSION -t $REGISTRY/${IMAGE_NAME}:latest .
-          docker push $REGISTRY/${IMAGE_NAME}:$VERSION
-          docker push $REGISTRY/${IMAGE_NAME}:latest
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          build-args: APP_VERSION=${{ steps.semantic.outputs.new_release_version }}
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.semantic.outputs.new_release_version }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

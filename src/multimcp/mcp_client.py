@@ -4,6 +4,8 @@ from typing import Dict, Optional, Any
 from copy import deepcopy
 import os
 
+import anyio
+
 from mcp.client.stdio import StdioServerParameters, stdio_client
 from mcp.client.session import ClientSession
 from mcp.client.sse import sse_client
@@ -79,9 +81,12 @@ class MCPClientManager:
 
         if managed.stack and not managed.external:
             try:
-                await managed.stack.aclose()
-            except RuntimeError as exc:
-                # AnyIO stdio_client contexts require closing from the creating task; fall back to cancellation.
+                # Shield the cleanup from anyio cancellation so that removing a client
+                # during a config hot-reload (which runs inside a task group cancel scope)
+                # doesn't propagate CancelledError and crash the server.
+                with anyio.CancelScope(shield=True):
+                    await managed.stack.aclose()
+            except Exception as exc:
                 self.logger.warning(
                     "⚠️ AsyncExitStack close for '%s' raised %s; continuing with best-effort cleanup.",
                     name,

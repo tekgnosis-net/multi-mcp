@@ -1,3 +1,10 @@
+## [1.0.5](https://github.com/tekgnosis-net/multi-mcp/compare/v1.0.4...v1.0.5) (2026-03-06)
+
+
+### Bug Fixes
+
+* **docker:** use JSON exec form for CMD to ensure proper signal handling ([575b5e2](https://github.com/tekgnosis-net/multi-mcp/commit/575b5e2c9a8c88ac74f10a3220ec582257983bb3))
+
 ## [1.0.4](https://github.com/tekgnosis-net/multi-mcp/compare/v1.0.3...v1.0.4) (2026-03-06)
 
 

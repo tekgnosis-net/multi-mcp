@@ -64,4 +64,4 @@ ENV MCP_HOST=0.0.0.0
 ENV MCP_PORT=8096
 ENV LOG_LEVEL=INFO
 
-CMD python main.py --transport $TRANSPORT_TYPE --config $CONFIG_FILE --host $MCP_HOST --port $MCP_PORT --log-level $LOG_LEVEL
+CMD ["sh", "-c", "exec python main.py --transport $TRANSPORT_TYPE --config $CONFIG_FILE --host $MCP_HOST --port $MCP_PORT --log-level $LOG_LEVEL"]

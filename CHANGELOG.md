@@ -1,3 +1,10 @@
+## [1.0.4](https://github.com/tekgnosis-net/multi-mcp/compare/v1.0.3...v1.0.4) (2026-03-06)
+
+
+### Bug Fixes
+
+* **client:** shield stack.aclose() from anyio cancellation during hot-reload ([9c5cd6b](https://github.com/tekgnosis-net/multi-mcp/commit/9c5cd6bf37ef6042b731fb5a4fde1d69a4e746f3))
+
 ## [1.0.3](https://github.com/tekgnosis-net/multi-mcp/compare/v1.0.2...v1.0.3) (2026-03-06)
 
 

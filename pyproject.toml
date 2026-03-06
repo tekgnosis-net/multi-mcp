@@ -1,6 +1,6 @@
 [project]
 name = "multi-mcp"
-version = "1.0.1"
+version = "1.0.2"
 description = "MCP proxy project with multi-client support"
 requires-python = ">=3.10"
 

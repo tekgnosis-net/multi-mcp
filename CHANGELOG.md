@@ -1,3 +1,10 @@
+## [1.0.2](https://github.com/tekgnosis-net/multi-mcp/compare/v1.0.1...v1.0.2) (2026-03-06)
+
+
+### Bug Fixes
+
+* **deps:** remove langchain/openai example-only deps that conflict with mcp==1.26.0 ([055294a](https://github.com/tekgnosis-net/multi-mcp/commit/055294a6020da1c579e530ba95b90240698910eb))
+
 ## [1.0.1](https://github.com/tekgnosis-net/multi-mcp/compare/v1.0.0...v1.0.1) (2026-03-06)
 
 

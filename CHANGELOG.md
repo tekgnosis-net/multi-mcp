@@ -1,3 +1,10 @@
+## [1.0.3](https://github.com/tekgnosis-net/multi-mcp/compare/v1.0.2...v1.0.3) (2026-03-06)
+
+
+### Bug Fixes
+
+* **logging:** suppress watchfiles rust notify timeout debug spam ([effaad7](https://github.com/tekgnosis-net/multi-mcp/commit/effaad7574a824aa8b48f5c62ab4e943afa6cb7f))
+
 ## [1.0.2](https://github.com/tekgnosis-net/multi-mcp/compare/v1.0.1...v1.0.2) (2026-03-06)
 
 

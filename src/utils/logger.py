@@ -31,5 +31,10 @@ def configure_logging(
     logging.basicConfig(
         level=level,
         format="%(message)s",  # Rich handles formatting
-        handlers=[RichHandler(console=Console(stderr=True), rich_tracebacks=True, show_time=False, )],
+        handlers=[RichHandler(console=Console(stderr=True), rich_tracebacks=True, show_time=False)],
     )
+
+    # Suppress noisy watchfiles Rust-backend poll-timeout debug messages.
+    # These appear as "rust notify timeout, continuing" on every poll interval
+    # even when nothing has changed — not useful at any log level.
+    logging.getLogger("watchfiles").setLevel(logging.WARNING)
